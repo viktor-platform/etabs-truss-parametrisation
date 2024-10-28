@@ -8,12 +8,12 @@ class Parametrization(vkt.Parametrization):
     # Structure Params
     text_building = vkt.Text('## Structure Geometry')
     
-    x_bay_width = vkt.NumberField('X Bay Width', min=2000, default=10000)
+    x_bay_width = vkt.NumberField('X Bay Width', min=2000, default=8000)
     y_bay_width = vkt.NumberField('Y Bay Width', min=2000, default=10000)
     columns_height = vkt.NumberField('Columns Height', min=3000, default=6000)
-    n_diagonals = vkt.NumberField('Number of Diagonals', min=3, default=8)
-    truss_depth = vkt.NumberField('Truss Depth', min=300, default=500)
-    joist_n_diags = vkt.NumberField('Joist Number of Diagonals', min=5, default=10)
+    n_diagonals = vkt.NumberField('Number of Joist', min=3, default=8)
+    truss_depth = vkt.NumberField('Truss Depth', min=300, default=1000)
+    joist_n_diags = vkt.NumberField('Joist Number of Diagonals', min=5, default=14)
 
 
 class Controller(vkt.Controller):
@@ -50,14 +50,26 @@ class Controller(vkt.Controller):
         # Clean repeated nodes
         nodes, lines = clean_model(Nodes=model.nodes, Lines=model.lines)
 
+        color_dict = {
+            "Truss": vkt.Material(color=vkt.Color(r=255, g=105, b=180)),  # Bright Pastel Pink
+            "Column": vkt.Material(color=vkt.Color(r=100, g=200, b=250)),  # Bright Pastel Blue
+            "Joist": vkt.Material(color=vkt.Color(r=255, g=220, b=130)),  # Bright Pastel Yellow
+        }
+
+        section_dict = {
+        "Truss":150,
+        "Column":500,
+        "Joist":100,
+
+        }
 
         sections_group = []
         rendered_sphere = set()
 
         for line_id, dict_vals in lines.items():
 
-            node_id_i = dict_vals["start"]
-            node_id_j = dict_vals["end"]
+            node_id_i = dict_vals["nodeI"]
+            node_id_j = dict_vals["nodeJ"]
 
             node_i = nodes[node_id_i]
             node_j = nodes[node_id_j]
@@ -72,17 +84,19 @@ class Controller(vkt.Controller):
             
             # To Do: This can be simplified 
             if not node_id_i in rendered_sphere:
-                sphere_k = vkt.Sphere(point_i, radius=80,material=None, identifier= str(node_id_i))
+                sphere_k = vkt.Sphere(point_i, radius=40,material=None, identifier= str(node_id_i))
                 sections_group.append(sphere_k)
                 rendered_sphere.add(node_id_i)
 
             if not node_id_j in rendered_sphere:
-                sphere_k = vkt.Sphere(point_j , radius=80, material= None,  identifier= str(node_id_j))
+                sphere_k = vkt.Sphere(point_j , radius=40, material= None,  identifier= str(node_id_j))
                 sections_group.append(sphere_k)
                 rendered_sphere.add(node_id_j)
 
             line_k = vkt.Line(point_i, point_j)
-            section_k = vkt.RectangularExtrusion(100, 100, line_k, identifier=str(line_id))
+            material = color_dict[dict_vals["component"]]
+            sec_size = section_dict[dict_vals["component"]]
+            section_k = vkt.RectangularExtrusion(sec_size, sec_size, line_k, identifier=str(line_id), material = color_dict[dict_vals["component"]])
             sections_group.append(section_k)
 
         return vkt.GeometryResult(geometry=sections_group)
