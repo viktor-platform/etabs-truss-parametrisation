@@ -1,7 +1,7 @@
 from app.components import Truss,Columns,create_joists
 from app.model import Model
-from app.clean_model import clean_model
-
+from app.clean_model import clean_model,get_nodes_by_z
+from tests.utils import plot_3d_structure
 # Create Truss and Columns
 x_bay_width = 10000
 y_bay_width = 10000
@@ -36,3 +36,6 @@ model = Model(components=components)
 model.build()
 # Clean repeated nodes
 nodes, lines = clean_model(Nodes=model.nodes, Lines=model.lines)
+nodes_with_load = get_nodes_by_z(nodes,columns_height)
+print(f"{nodes_with_load=},Number_of_nodes = {len(nodes_with_load)}")
+plot_3d_structure(nodes,lines)

@@ -31,3 +31,6 @@ def clean_model(Nodes: dict, Lines: dict) -> tuple[dict, dict]:
         del Nodes[dup_node]
 
     return Nodes, Lines
+
+def get_nodes_by_z(Nodes:dict, z:float)->list[int]:
+    return [node_id for node_id, attrs in Nodes.items() if attrs["z"]==z]
