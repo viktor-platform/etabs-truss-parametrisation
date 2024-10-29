@@ -26,7 +26,7 @@ class Line(BaseModel):
     id: int
     nodeI: int
     nodeJ: int
-    component: str | None = Field(default= None)
+    component: str | None = Field(default=None)
 
 
 class LineList(BaseModel):
@@ -57,7 +57,7 @@ class Truss:
         plane: Plane,
         lines_id: int = 0,
         nodes_id: int = 0,
-        component_name: str | None = None
+        component_name: str | None = None,
     ) -> None:
         self.height = height
         self.width = width
@@ -121,7 +121,7 @@ class Truss:
                 id=self.gen_line_tag(),
                 nodeI=chord_nodes[i].id,
                 nodeJ=chord_nodes[i + 1].id,
-                component = self.component_name
+                component=self.component_name,
             )
             for i in range(len(chord_nodes) - 1)
         ]
@@ -137,8 +137,10 @@ class Truss:
             tags_st1 = sorted([required_st1_ids[0]] + [required_st1_ids[-1]] + required_st1_ids[1:-1] * 2)
             tags_st2 = sorted(required_st2_ids[:] * 2)
 
-            for tag_st1, tag_st2 in zip(tags_st1, tags_st2):
-                self.lines.add_lines(Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2,component=self.component_name))
+            for tag_st1, tag_st2 in zip(tags_st1, tags_st2, strict=True):
+                self.lines.add_lines(
+                    Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2, component=self.component_name)
+                )
         else:
             # Shortest way to get the right nodes
             required_st1_ids = top_chord_ids[:-1:2]
@@ -147,8 +149,16 @@ class Truss:
             tags_st1 = sorted([required_st1_ids[0]] + required_st1_ids[1:] * 2)
             tags_st2 = sorted([required_st2_ids[-1]] + required_st2_ids[:-1] * 2)
 
-            for tag_st1, tag_st2 in zip(tags_st1, tags_st2):
-                self.lines.add_lines(Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2,component=self.component_name))
+            for tag_st1, tag_st2 in zip(tags_st1, tags_st2, strict=True):
+                self.lines.add_lines(
+                    Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2, component=self.component_name)
+                )
+
+        # Create vertical members
+        for node_top, node_bottom in zip(top_chord_ids, bottom_chord_ids, strict=True):
+            self.lines.add_lines(
+                Line(id=self.gen_line_tag(), nodeI=node_top, nodeJ=node_bottom, component=self.component_name)
+            )
 
     def create(self) -> tuple[dict[int, Node], dict[int, Line]]:
         bottom_chord_nodes = self.create_chord_nodes(
@@ -187,7 +197,7 @@ class Columns:
         nodes_id: int = 0,
         lines_id: int = 0,
         partition: int = 2,
-        component_name: str | None = None
+        component_name: str | None = None,
     ) -> None:
         self.xo = xo
         self.yo = yo
@@ -236,7 +246,7 @@ class Columns:
                 id=self.gen_line_tag(),
                 nodeI=column_nodes[i].id,
                 nodeJ=column_nodes[i + 1].id,
-                component=self.component_name
+                component=self.component_name,
             )
             for i in range(len(column_nodes) - 1)
         ]
@@ -245,7 +255,7 @@ class Columns:
         return self.nodes.serialize(), self.lines.serialize()
 
 
-def create_joists(ref_truss: Truss,height:float, width: float, n_diagonal: int) -> list[Truss]:
+def create_joists(ref_truss: Truss, height: float, width: float, n_diagonal: int) -> list[Truss]:
     """Crates joist based on reference truss"""
     joist_list = []
     nodes, lines = ref_truss.create()
@@ -253,7 +263,14 @@ def create_joists(ref_truss: Truss,height:float, width: float, n_diagonal: int) 
     for joint_tag in joist_nodes_tags:
         node = nodes[joint_tag]
         temp_truss = Truss(
-            height=height, width=width, n_diagonals=n_diagonal, xo=node["x"], yo=node["y"], zo=node["z"], plane="yz",component_name= "Joist"
+            height=height,
+            width=width,
+            n_diagonals=n_diagonal,
+            xo=node["x"],
+            yo=node["y"],
+            zo=node["z"],
+            plane="yz",
+            component_name="Joist",
         )
         joist_list.append(temp_truss)
     return joist_list

@@ -1,6 +1,6 @@
-from app.components import Truss,Columns,create_joists
-from app.model import Model
-from app.clean_model import clean_model,get_nodes_by_z
+from app.components.components import Truss,Columns,create_joists
+from app.components.model import Model
+from app.components.clean_model import clean_model,get_nodes_by_z
 from tests.utils import plot_3d_structure
 # Create Truss and Columns
 x_bay_width = 10000
@@ -29,7 +29,7 @@ column4 = Columns(height=columns_height, xo=x_bay_width, yo=y_bay_width, zo=0, n
 
 components = [truss1, column1, column2, truss2, truss3, column4, column3, truss4]
 
-joist_list = create_joists(ref_truss=truss1 , width=y_bay_width,n_diagonal=joist_n_diags)
+joist_list = create_joists(ref_truss=truss1 , height= truss_depth,width=y_bay_width,n_diagonal=joist_n_diags)
 components.extend(joist_list)
 
 model = Model(components=components)
