@@ -3,7 +3,7 @@ from app.components.model  import Model
 from app.components.clean_model import clean_model, get_nodes_by_z
 
 
-def generate_model(truss_depth,x_bay_width,y_bay_width,n_diagonals,columns_height,joist_n_diags):
+def generate_model(truss_depth,x_bay_width,y_bay_width,n_diagonals,columns_height,joist_n_diags,area_load):
         truss1 = Truss(
             height=truss_depth,
             width=x_bay_width,
@@ -75,4 +75,6 @@ def generate_model(truss_depth,x_bay_width,y_bay_width,n_diagonals,columns_heigh
         # Supports
         supports = get_nodes_by_z(nodes, 0)
 
-        return nodes, lines , nodes_with_load, supports
+        point_load = area_load * 0.001 * (x_bay_width * y_bay_width) / len(nodes_with_load)
+
+        return nodes, lines , nodes_with_load, supports , point_load

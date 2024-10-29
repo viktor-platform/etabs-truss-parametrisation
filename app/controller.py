@@ -3,7 +3,21 @@ import viktor as vkt
 import math
 from pathlib import Path
 from .structure import generate_model
+
 NODE_RADIUS = 40
+
+
+def export2json(nodes,lines,nodes_with_load,point_load,supports):
+    input_json = Path.cwd() / "app" / "inputs.json"
+    with open(input_json, "w") as jsonfile:
+        data = {
+            "nodes": nodes,
+            "lines": lines,
+            "nodes_with_load": nodes_with_load,
+            "load_magnitud": point_load,
+            "supports": supports,
+        }
+        json.dump(data, jsonfile)
 
 
 class Parametrization(vkt.Parametrization):
@@ -15,20 +29,23 @@ class Parametrization(vkt.Parametrization):
     x_bay_width = vkt.NumberField("X Bay Width", min=2000, default=8000)
     y_bay_width = vkt.NumberField("Y Bay Width", min=2000, default=15000)
     columns_height = vkt.NumberField("Columns Height", min=3000, default=6000)
-    n_diagonals = vkt.NumberField("Number of Joist", min=3, default=4)
+    n_diagonals = vkt.NumberField("Number of Joist", min=3, default=6)
     truss_depth = vkt.NumberField("Truss Depth", min=300, default=1000)
-    joist_n_diags = vkt.NumberField("Joist Number of Diagonals", min=5, default=14)
+    joist_n_diags = vkt.NumberField("Joist Number of Diagonals", min=5, default=8)
     area_load = vkt.NumberField("Area Load [kn/m2]", min=5, max=7, default=5)
 
     text_settings = vkt.Text("## Optimization settings")
-    option = vkt.OptionField('Select Feature', options=['Joist Number', 'Truss Depth'], default='Joist Number')
-    button = vkt.ActionButton('Optimize!', method='multiple_models')
+    option = vkt.OptionField("Select Feature", options=["Joist Number", "Truss Depth"], default="Joist Number")
+    n_iteration = vkt.NumberField("Area Load [kn/m2]", min=1, max=5, default=3)
+    button = vkt.ActionButton("Optimize!", method="optimize")
+
 
 class Controller(vkt.Controller):
-    """This class renders, creates the geometry and the sap2000 model"""
-
     label = "Structure Controller"
     parametrization = Parametrization
+
+
+
 
     def create_load_arrow(self, point_node: dict, magnitude: float, direction: str = "z", material=None) -> vkt.Group:
         """Function to create a load arrow from a selected node"""
@@ -36,7 +53,6 @@ class Controller(vkt.Controller):
         size_arrow = abs(magnitude / 20)
         scale_point = 1.5
         scale_arrow_line = 7
-        print(f"params: {point_node["x"]=},{size_arrow=}")
         # Create points for the origin of the arrow point and line, based on the coordinate of the node with the load
         origin_of_arrow_point = vkt.Point(point_node["x"] - size_arrow - NODE_RADIUS, point_node["y"], point_node["z"])
         origin_of_arrow_line = vkt.Point(origin_of_arrow_point.x - size_arrow, origin_of_arrow_point.y, origin_of_arrow_point.z)
@@ -65,11 +81,16 @@ class Controller(vkt.Controller):
 
     @vkt.GeometryView("3D model", duration_guess=1, x_axis_to_right=True)
     def create_render(self, params, **kwargs):
-
-        nodes, lines , nodes_with_load, supports = generate_model(params.truss_depth,params.x_bay_width,params.y_bay_width,params.n_diagonals,params.columns_height,params.joist_n_diags)
-
-        point_load = params.area_load * 0.001 * (params.x_bay_width * params.y_bay_width) / len(nodes_with_load)
-
+        nodes, lines, nodes_with_load, supports, point_load = generate_model(
+            params.truss_depth,
+            params.x_bay_width,
+            params.y_bay_width,
+            params.n_diagonals,
+            params.columns_height,
+            params.joist_n_diags,
+            params.area_load,
+        )
+        export2json(nodes,lines,nodes_with_load,point_load,supports)
         color_dict = {
             "Truss": vkt.Material(color=vkt.Color(r=255, g=105, b=180)),  # Bright Pastel Pink
             "Column": vkt.Material(color=vkt.Color(r=100, g=200, b=250)),  # Bright Pastel Blue
@@ -113,15 +134,6 @@ class Controller(vkt.Controller):
                 sec_size, sec_size, line_k, identifier=str(line_id), material=color_dict[dict_vals["component"]]
             )
             sections_group.append(section_k)
-        input_json = Path.cwd() /"app"/ "inputs.json"
-        with open(input_json,"w") as jsonfile:
-            data = {"nodes":nodes,
-                    "lines":lines,
-                    "nodes_with_load":nodes_with_load,
-                    "load_magnitud": point_load,
-                    "supports":supports}
-                        
-            json.dump(data, jsonfile) 
 
         # Render loads
         load_list = []
@@ -132,3 +144,38 @@ class Controller(vkt.Controller):
             sections_group.append(loads_arrow)
 
         return vkt.GeometryResult(geometry=sections_group)
+
+    def optimize(self, params, **kwargs):
+        if params.option == "Joist Number":
+            n_iterations = params.n_iteration
+            base = params.n_diagonals
+            delta = 1
+            ranges = [0, -1, 1, 2, -2, 3, -3, 4 - 4, 5, -5, 6, -6]
+            models = []
+            values = []
+            for i in ranges[:n_iterations]:
+                value = base + i * delta
+                if value >= 2 and value not in values:
+                    values.append(value)
+                    nodes, lines, nodes_with_load, supports, point_load = generate_model(
+                        params.truss_depth,
+                        params.x_bay_width,
+                        params.y_bay_width,
+                        value,
+                        params.columns_height,
+                        params.joist_n_diags,
+                        params.area_load,
+                    )
+
+                    models.append( {
+                        "nodes": nodes,
+                        "lines": lines,
+                        "nodes_with_load": nodes_with_load,
+                        "load_magnitud": point_load,
+                        "supports": supports,
+                    })
+            input_json = Path.cwd() / "app" / "inputs.json"
+            with open(input_json, "w") as jsonfile:
+                json.dump(models,jsonfile)
+
+

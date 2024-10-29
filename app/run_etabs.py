@@ -4,36 +4,36 @@ import json
 from pathlib import Path
 import json
 
-def create_frame_data(length, height):
-    nodes = {
-        1:{"node_id": 1, "x": 0, "y": 0, "z": 0},
-        2:{"node_id": 2, "x": 0, "y": length, "z": 0},
-        3:{"node_id": 3, "x": 0, "y": 0, "z": height},
-        4:{"node_id": 4, "x": 0, "y": length, "z": height},
-        5:{"node_id": 5, "x": length, "y": 0, "z": 0},
-        6:{"node_id": 6, "x": length, "y": length, "z": 0},
-        7:{"node_id": 7, "x": length, "y": 0, "z": height},
-        8:{"node_id": 8, "x": length, "y": length, "z": height},
-    }
-    lines = {
-        1:{"line_id": 1, "node_i": 1, "node_j": 3},
-        2:{"line_id": 2, "node_i": 2, "node_j": 4},
-        3:{"line_id": 3, "node_i": 3, "node_j": 4},
-        4:{"line_id": 4, "node_i": 6, "node_j": 8},
-        5:{"line_id": 5, "node_i": 5, "node_j": 7},
-        6:{"line_id": 6, "node_i": 3, "node_j": 7},
-        7:{"line_id": 7, "node_i": 4, "node_j": 8},
-        8:{"line_id": 8, "node_i": 7, "node_j": 8},
-    }
+# def create_frame_data(length, height):
+#     nodes = {
+#         1:{"node_id": 1, "x": 0, "y": 0, "z": 0},
+#         2:{"node_id": 2, "x": 0, "y": length, "z": 0},
+#         3:{"node_id": 3, "x": 0, "y": 0, "z": height},
+#         4:{"node_id": 4, "x": 0, "y": length, "z": height},
+#         5:{"node_id": 5, "x": length, "y": 0, "z": 0},
+#         6:{"node_id": 6, "x": length, "y": length, "z": 0},
+#         7:{"node_id": 7, "x": length, "y": 0, "z": height},
+#         8:{"node_id": 8, "x": length, "y": length, "z": height},
+#     }
+#     lines = {
+#         1:{"line_id": 1, "node_i": 1, "node_j": 3},
+#         2:{"line_id": 2, "node_i": 2, "node_j": 4},
+#         3:{"line_id": 3, "node_i": 3, "node_j": 4},
+#         4:{"line_id": 4, "node_i": 6, "node_j": 8},
+#         5:{"line_id": 5, "node_i": 5, "node_j": 7},
+#         6:{"line_id": 6, "node_i": 3, "node_j": 7},
+#         7:{"line_id": 7, "node_i": 4, "node_j": 8},
+#         8:{"line_id": 8, "node_i": 7, "node_j": 8},
+#     }
 
-    with open("inputs.json","w") as jsonfile:
-        data = {"nodes":nodes,
-                "lines":lines,
-                "nodes_with_load":[3,4,7,8],
-                "load_magnitud": 1000}
-        json.dump(data, jsonfile) 
+#     with open("inputs.json","w") as jsonfile:
+#         data = {"nodes":nodes,
+#                 "lines":lines,
+#                 "nodes_with_load":[3,4,7,8],
+#                 "load_magnitud": 1000}
+#         json.dump(data, jsonfile) 
 
-    return nodes, lines
+#     return nodes, lines
 
 def start_etabs():
     program_path = r"C:\Program Files\Computers and Structures\ETABS 22\ETABS.exe"
@@ -131,7 +131,7 @@ def create_etabs_model(EtabsObject, data:dict):
     
     return deformations
 
-def run_n_times(n=2):
+def run_n_times():
     result_list = []
 
     input_json = Path.cwd() / "inputs.json"
@@ -139,8 +139,8 @@ def run_n_times(n=2):
         data = json.load(jsonfile)
 
     EtabsObject,EtabsEngine = start_etabs()
-    for _ in range(n):
-        results = create_etabs_model(EtabsObject,data)
+    for model in data:
+        results = create_etabs_model(EtabsObject,model)
         result_list.append(results)
         EtabsObject.InitializeNewModel(9)
         EtabsObject.File.NewBlank()
@@ -151,19 +151,9 @@ def run_n_times(n=2):
 
     ret = EtabsEngine.ApplicationExit(False)
 
-
-
-    # ret = EtabsEngine.ApplicationExit(False)
-
-    # return ret
-
 if __name__ == "__main__":
-    input_json = Path.cwd() / "inputs.json"
-    with open(input_json) as jsonfile:
-        data = json.load(jsonfile)
+    run_n_times()
 
-    EtabsObject,EtabsEngine = start_etabs()
-    results = create_etabs_model(EtabsObject,data)
 
 
 
