@@ -245,7 +245,7 @@ class Columns:
         return self.nodes.serialize(), self.lines.serialize()
 
 
-def create_joists(ref_truss: Truss, width: float, n_diagonal: int) -> list[Truss]:
+def create_joists(ref_truss: Truss,height:float, width: float, n_diagonal: int) -> list[Truss]:
     """Crates joist based on reference truss"""
     joist_list = []
     nodes, lines = ref_truss.create()
@@ -253,7 +253,7 @@ def create_joists(ref_truss: Truss, width: float, n_diagonal: int) -> list[Truss
     for joint_tag in joist_nodes_tags:
         node = nodes[joint_tag]
         temp_truss = Truss(
-            height=1000, width=width, n_diagonals=n_diagonal, xo=node["x"], yo=node["y"], zo=node["z"], plane="yz",component_name= "Joist"
+            height=height, width=width, n_diagonals=n_diagonal, xo=node["x"], yo=node["y"], zo=node["z"], plane="yz",component_name= "Joist"
         )
         joist_list.append(temp_truss)
     return joist_list

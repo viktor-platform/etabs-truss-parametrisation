@@ -27,12 +27,15 @@ def create_frame_data(length, height):
     }
 
     with open("inputs.json","w") as jsonfile:
-        json.dump([nodes, lines], jsonfile) 
+        data = {"nodes":nodes,
+                "lines":lines,
+                "nodes_with_load":[3,4,7,8],
+                "load_magnitud": 1000}
+        json.dump(data, jsonfile) 
 
     return nodes, lines
 
-
-def create_etabs_model():
+def start_etabs():
     program_path = r"C:\Program Files\Computers and Structures\ETABS 22\ETABS.exe"
     pythoncom.CoInitialize()
     helper = comtypes.client.CreateObject("ETABSv1.Helper")
@@ -42,10 +45,9 @@ def create_etabs_model():
     EtabsObject = EtabsEngine.SapModel
     EtabsObject.InitializeNewModel(9)
     EtabsObject.File.NewBlank()
+    return EtabsObject,EtabsEngine
 
-    input_json = Path.cwd() / "inputs.json"
-    with open(input_json) as jsonfile:
-        data = json.load(jsonfile)
+def create_etabs_model(EtabsObject, data:dict):
     nodes = data['nodes']
     lines = data['lines']
     nodes_with_load = data['nodes_with_load']
@@ -71,20 +73,21 @@ def create_etabs_model():
     EtabsObject.SetPresentUnits(9)
     ret = EtabsObject.PropMaterial.SetMaterial(material_name, MATERIAL_STEEL)
     ret = EtabsObject.PropMaterial.SetMPIsotropic(material_name, 210000, 0.3, 1.2e-5)
-    for section_name, section_props in sections.items():
-        ret = EtabsObject.PropFrame.SetTube(
-            Name=section_name,
-            MatProp=material_name,
-            T3=section_props["depth"],
-            T2=section_props["depth"],
-            Tf=section_props["thickness"],
-            Tw=section_props["thickness"]
-        )
+
+    ret = EtabsObject.PropFrame.SetTube_1(
+        "SHS60X3",
+        material_name,
+        60,
+        60,
+        3,
+        3,
+        3,
+    )
 
     for id, line in lines.items():
-        point_i = line["node_i"]
-        point_j = line["node_j"]
-        section_name = line["section"]
+        point_i = line["nodeI"]
+        point_j = line["nodeJ"]
+        section_name = "SHS60X3"
         ret, _ = EtabsObject.FrameObj.AddByPoint(
             str(point_i), str(point_j), str(id), section_name, "Global"
         )
@@ -93,18 +96,26 @@ def create_etabs_model():
     ret = EtabsObject.LoadPatterns.Add(load_pattern_name, 8, 0)
     EtabsObject.SetPresentUnits(9)
 
-    load_magnitude = 1000
+    load_magnitude = data["load_magnitud"]
     for node_id in nodes_with_load:
         node_name = str(node_id)
         load_values = [0, 0, -load_magnitude, 0, 0, 0]
         ret = EtabsObject.PointObj.SetLoadForce(
-            Name=node_name,
-            MyName=load_pattern_name,
-            Value=load_values,
-            Replace=True,
-            CSys='Global'
+            node_name,
+            load_pattern_name,
+            load_values,
+            True,
+            'Global'
         )
 
+    supports = data["supports"]
+    for node_id in supports:
+        ret = EtabsObject.PointObj.SetRestraint(str(node_id), [1, 1, 1, 1, 1, 1])
+    
+    EtabsObject.View.RefreshView(0,False)
+    file_path = Path.cwd() / "etabsmodel.edb"
+    EtabsObject.File.Save(str(file_path))
+    EtabsObject.Analyze.RunAnalysis()
     ret = EtabsObject.Analyze.RunAnalysis()
 
     ret = EtabsObject.Results.Setup.DeselectAllCasesAndCombosForOutput()
@@ -112,26 +123,48 @@ def create_etabs_model():
     deformations = {}
     for node_id in nodes_with_load:
         node_name = str(node_id)
-        ret, number_results, obj, elm, load_case, step_type, step_num, u1, u2, u3, r1, r2, r3 = EtabsObject.Results.JointDispl(
-            PointName=node_name,
-            ItemType=2
-        )
-        if number_results > 0:
-            deformations[node_name] = u3[0]
-        else:
-            deformations[node_name] = None
+        number_results, obj, elm, load_case, step_type, step_num, u1, u2, u3, r1, r2, r3,ret  = EtabsObject.Results.JointDispl(
+                    Name = node_name,
+                    ItemTypeElm = 0,
+                )
+        deformations[node_name] = u3[0]
+    
+    return deformations
+
+def run_n_times(n=2):
+    result_list = []
+
+    input_json = Path.cwd() / "inputs.json"
+    with open(input_json) as jsonfile:
+        data = json.load(jsonfile)
+
+    EtabsObject,EtabsEngine = start_etabs()
+    for _ in range(n):
+        results = create_etabs_model(EtabsObject,data)
+        result_list.append(results)
+        EtabsObject.InitializeNewModel(9)
+        EtabsObject.File.NewBlank()
 
     output = Path.cwd() / "output.json"
     with open(output, "w") as jsonfile:
-        json.dump(deformations, jsonfile)
+        json.dump(result_list, jsonfile)
+
+    ret = EtabsEngine.ApplicationExit(False)
+
+
 
     # ret = EtabsEngine.ApplicationExit(False)
-    pythoncom.CoUninitialize()  # Ensure cleanup is performed
 
-    return ret
+    # return ret
 
 if __name__ == "__main__":
-    create_frame_data(2000, 2000)
-    create_etabs_model()
+    input_json = Path.cwd() / "inputs.json"
+    with open(input_json) as jsonfile:
+        data = json.load(jsonfile)
+
+    EtabsObject,EtabsEngine = start_etabs()
+    results = create_etabs_model(EtabsObject,data)
+
+
 
 
