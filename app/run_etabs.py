@@ -4,37 +4,6 @@ import json
 from pathlib import Path
 import json
 
-# def create_frame_data(length, height):
-#     nodes = {
-#         1:{"node_id": 1, "x": 0, "y": 0, "z": 0},
-#         2:{"node_id": 2, "x": 0, "y": length, "z": 0},
-#         3:{"node_id": 3, "x": 0, "y": 0, "z": height},
-#         4:{"node_id": 4, "x": 0, "y": length, "z": height},
-#         5:{"node_id": 5, "x": length, "y": 0, "z": 0},
-#         6:{"node_id": 6, "x": length, "y": length, "z": 0},
-#         7:{"node_id": 7, "x": length, "y": 0, "z": height},
-#         8:{"node_id": 8, "x": length, "y": length, "z": height},
-#     }
-#     lines = {
-#         1:{"line_id": 1, "node_i": 1, "node_j": 3},
-#         2:{"line_id": 2, "node_i": 2, "node_j": 4},
-#         3:{"line_id": 3, "node_i": 3, "node_j": 4},
-#         4:{"line_id": 4, "node_i": 6, "node_j": 8},
-#         5:{"line_id": 5, "node_i": 5, "node_j": 7},
-#         6:{"line_id": 6, "node_i": 3, "node_j": 7},
-#         7:{"line_id": 7, "node_i": 4, "node_j": 8},
-#         8:{"line_id": 8, "node_i": 7, "node_j": 8},
-#     }
-
-#     with open("inputs.json","w") as jsonfile:
-#         data = {"nodes":nodes,
-#                 "lines":lines,
-#                 "nodes_with_load":[3,4,7,8],
-#                 "load_magnitud": 1000}
-#         json.dump(data, jsonfile) 
-
-#     return nodes, lines
-
 def start_etabs():
     program_path = r"C:\Program Files\Computers and Structures\ETABS 22\ETABS.exe"
     pythoncom.CoInitialize()
@@ -121,15 +90,20 @@ def create_etabs_model(EtabsObject, data:dict):
     ret = EtabsObject.Results.Setup.DeselectAllCasesAndCombosForOutput()
     ret = EtabsObject.Results.Setup.SetCaseSelectedForOutput(load_pattern_name)
     deformations = {}
-    for node_id in nodes_with_load:
-        node_name = str(node_id)
+    joist_deformation = []
+    for node_name, vals in nodes.items():
+        print(node_id, type(node_id))
+        node_id =vals["id"]
         number_results, obj, elm, load_case, step_type, step_num, u1, u2, u3, r1, r2, r3,ret  = EtabsObject.Results.JointDispl(
                     Name = node_name,
                     ItemTypeElm = 0,
                 )
-        deformations[node_name] = u3[0]
-    
-    return deformations
+        deformations[node_id] = u3[0]
+        if node_id in nodes_with_load:
+            print(u3)
+            joist_deformation.append(u3[0])
+        
+    return {"deformations":deformations , "max_defo":max(abs(joist_deformation))}
 
 def run_n_times():
     result_list = []
