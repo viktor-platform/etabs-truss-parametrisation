@@ -92,7 +92,6 @@ def create_etabs_model(EtabsObject, data:dict):
     deformations = {}
     joist_deformation = []
     for node_name, vals in nodes.items():
-        print(node_id, type(node_id))
         node_id =vals["id"]
         number_results, obj, elm, load_case, step_type, step_num, u1, u2, u3, r1, r2, r3,ret  = EtabsObject.Results.JointDispl(
                     Name = node_name,
@@ -100,7 +99,6 @@ def create_etabs_model(EtabsObject, data:dict):
                 )
         deformations[node_id] = u3[0]
         if node_id in nodes_with_load:
-            print(u3)
             joist_deformation.append(u3[0])
         
     return {"deformations":deformations , "max_defo":min(joist_deformation)}
@@ -111,6 +109,7 @@ def run_n_times():
     input_json = Path.cwd() / "inputs.json"
     with open(input_json) as jsonfile:
         data = json.load(jsonfile)
+
 
     EtabsObject,EtabsEngine = start_etabs()
     for model in data:

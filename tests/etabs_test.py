@@ -3,7 +3,7 @@ import pythoncom
 import json
 from pathlib import Path
 import json
-from app.run_etabs import create_etabs_model, start_etabs
+from app.run_etabs_model import create_etabs_model, start_etabs
 
 def create_frame_data(length, height):
     nodes = {

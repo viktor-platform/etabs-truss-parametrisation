@@ -8,6 +8,9 @@ from matplotlib.colors import ListedColormap
 
 from pathlib import Path
 from .structure import generate_model
+from io import BytesIO
+from viktor.external.generic import GenericAnalysis
+from viktor.core import File
 
 NODE_RADIUS = 40
 
@@ -57,7 +60,6 @@ You can select either to optimise the **number of joists** while fixing the trus
     step_2 = vkt.Step("Run Analysis", views=["optimize","get_hist_view"], width=30)
     step_2.text = vkt.Text("""## Results!
 The following view shows the deformed shape for the optimal model with the lowest displacement.The next view, **Model Comparison**, shows the deformation for each of the analyzed models and displays the allowable limit.""")
-    # step_2.deformation_scale = vkt.NumberField("Deformation scale factor", min=0, max=1e7, default=1000, num_decimals=2)
 
 
 class Controller(vkt.Controller):
@@ -123,7 +125,6 @@ class Controller(vkt.Controller):
             if deformation:
                 def_val = dict_vals["deformation"]
                 r,g,b = self.get_color_from_displacement(def_val,max_defo)
-                print(f"{r}",f"{g}",f"{b}")
                 material = vkt.Material(color=vkt.Color(r=r, g=g, b=b))
             section_k = vkt.RectangularExtrusion(sec_size, sec_size, line_k, identifier=str(line_id), material=material)
             sections_group.append(section_k)
@@ -167,7 +168,7 @@ class Controller(vkt.Controller):
             n_iterations = params.step_1.n_iteration
             base = params.step_1.n_joist + 1
             delta = 1
-            ranges = [0, -1, 1, 2, -2, 3, -3, 4 - 4, 5, -5, 6, -6]
+            ranges = [0, -1, 1, 2, -2, 3, -3, 4, - 4, 5, -5, 6, -6]
             models = []
             values = []
             for i in ranges[:n_iterations]:
@@ -194,14 +195,23 @@ class Controller(vkt.Controller):
                         }
                     )
 
-            input_json = Path.cwd() / "app" / "inputs.json"
-            with open(input_json, "w") as jsonfile:
-                json.dump(models, jsonfile)
+            input_json = json.dumps(models)
+            script_path = Path(__file__).parent / "run_etabs_model.py"
 
-            output_json = Path.cwd() / "app" / "output copy 2.json"
-            with open(output_json) as jsonfile:
-                data = json.load(jsonfile)
-            # limit = -params.step_1.allowable_disp
+            files = [
+            ("inputs.json", BytesIO(bytes(input_json, 'utf8'))),
+            ("run_etabs_model.py", File.from_path(script_path))
+            ]
+            generic_analysis = GenericAnalysis(
+                files=files,
+                executable_key="run_etabs",
+                output_filenames=["output.json"]
+            )
+            generic_analysis.execute(timeout=500)
+
+            output_file = generic_analysis.get_output_file("output.json", as_file=True)
+            data = json.loads(output_file.getvalue())
+
             min_index, min_value = max(enumerate(data), key=lambda x: x[1]["max_defo"])
             opt_model = models[min_index]
 
@@ -223,7 +233,6 @@ class Controller(vkt.Controller):
                 defo_nj = data[min_index]["deformations"][str(nj)]
 
                 opt_model["lines"][line_id].update({"deformation": 0.5*(abs(defo_ni)+abs(defo_nj))})
-                print(opt_model["lines"][line_id])
 
             COLOR_BY = "component"
 
