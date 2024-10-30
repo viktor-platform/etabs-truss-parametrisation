@@ -1,6 +1,11 @@
 import json
 import viktor as vkt
 import math
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import ListedColormap
+
 from pathlib import Path
 from .structure import generate_model
 
@@ -22,29 +27,36 @@ def export2json(nodes, lines, nodes_with_load, point_load, supports):
 
 class Parametrization(vkt.Parametrization):
     """This class wraps the parameters of the app"""
-
     # Structure Params
     step_1 = vkt.Step("Create Model", views=["create_render"])
+    step_1.text = vkt.Text("""
+# Truss Optimisation App
 
-    step_1.x_bay_width = vkt.NumberField("X Bay Width", min=2000, default=8000)
-    step_1.y_bay_width = vkt.NumberField("Y Bay Width", min=2000, default=15000)
-    step_1.columns_height = vkt.NumberField("Columns Height", min=3000, default=6000)
+This app allows you to create parametric models in ETABS to optimise structural parameters, such as truss depth or the number of secondary beams. It also displays the deformation for the optimal model and compares the results between models.
+""")
+    step_1.title = vkt.Text("## Initial Parameters")
+
+    step_1.x_bay_width = vkt.NumberField("X Bay Width [mm]", min=2000, default=8000)
+    step_1.y_bay_width = vkt.NumberField("Y Bay Width [mm]", min=2000, default=15000)
+    step_1.columns_height = vkt.NumberField("Columns: Height [mm]", min=3000, default=6000)
     step_1.n_joist = vkt.NumberField("Number of Joist", min=3, default=3)
-    step_1.truss_depth = vkt.NumberField("Truss Depth", min=300, default=1000)
-    step_1.joist_n_diags = vkt.NumberField("Joist Number of Diagonals", min=5, default=8)
-    step_1.area_load = vkt.NumberField("Area Load [kn/m2]", min=5, max=7, default=5)
+    step_1.truss_depth = vkt.NumberField("Truss: Depth [mm]", min=300, default=1000)
+    step_1.joist_n_diags = vkt.NumberField("Joist: Number of Diagonals", min=5, default=8)
+    step_1.area_load = vkt.NumberField("Area Load [kN/m2]", min=5, max=7, default=5)
 
-    step_1.text_settings = vkt.Text("## Optimization settings")
+    step_1.text_settings2 = vkt.Text("""## Optimisation Settings
+You can select either to optimise the **number of joists** while fixing the truss depth, or to optimise the **truss depth** while fixing the number of joists. You can set the number of iterations, which will translate into separate ETABS models, with each iteration generating a new ETABS model.
+""")
+
     step_1.option = vkt.OptionField("Select Feature", options=["Joist Number", "Truss Depth"], default="Joist Number")
-    step_1.n_iteration = vkt.NumberField("Number of Iterations]", min=1, max=5, default=3)
+    step_1.n_iteration = vkt.NumberField("Number of Iterations", min=1, max=5, default=5)
+    step_1.allowable_disp = vkt.NumberField("Allowable Displacement", min=0, default=100)
+
     # step_1.button = vkt.ActionButton("Optimize!", method="optimize")
 
-    step_2 = vkt.Step("Run Analysis", views=["optimize"], width=30)
-    step_2.text = vkt.Text("""
-## Run the analysis and view the results
-To view the deformed building, click on 'Run analysis' in the bottom right 🔄. You can scale the deformation with the 
-'Deformation scale factor' below.
-    """)
+    step_2 = vkt.Step("Run Analysis", views=["optimize","get_hist_view"], width=30)
+    step_2.text = vkt.Text("""## Results!
+The following view shows the deformed shape for the optimal model with the lowest displacement.The next view, **Model Comparison**, shows the deformation for each of the analyzed models and displays the allowable limit.""")
     # step_2.deformation_scale = vkt.NumberField("Deformation scale factor", min=0, max=1e7, default=1000, num_decimals=2)
 
 
@@ -81,7 +93,7 @@ class Controller(vkt.Controller):
             
         return arrow
 
-    def render_frame_elements(self, lines: dict, nodes: dict, color_dict: dict, section_dict: dict, COLOR_BY: str) -> list:
+    def render_frame_elements(self, lines: dict, nodes: dict, color_dict: dict, section_dict: dict, COLOR_BY: str, deformation:bool = False, max_defo: float | None = None) -> list:
         sections_group = []
         rendered_sphere = set()
         for line_id, dict_vals in lines.items():
@@ -108,6 +120,11 @@ class Controller(vkt.Controller):
             line_k = vkt.Line(point_i, point_j)
             material = color_dict[dict_vals[COLOR_BY]]
             sec_size = section_dict[dict_vals[COLOR_BY]]
+            if deformation:
+                def_val = dict_vals["deformation"]
+                r,g,b = self.get_color_from_displacement(def_val,max_defo)
+                print(f"{r}",f"{g}",f"{b}")
+                material = vkt.Material(color=vkt.Color(r=r, g=g, b=b))
             section_k = vkt.RectangularExtrusion(sec_size, sec_size, line_k, identifier=str(line_id), material=material)
             sections_group.append(section_k)
 
@@ -136,7 +153,6 @@ class Controller(vkt.Controller):
         sections_group = self.render_frame_elements(lines, nodes, color_dict, section_dict, COLOR_BY)
 
         # Render loads
-        load_list = []
         for node_id in nodes_with_load:
             loads_arrow = self.create_load_arrow(
                 nodes[node_id], magnitude=point_load, material=vkt.Material(color=vkt.Color(r=255, g=10, b=10), opacity=0.8)
@@ -185,28 +201,89 @@ class Controller(vkt.Controller):
             output_json = Path.cwd() / "app" / "output copy 2.json"
             with open(output_json) as jsonfile:
                 data = json.load(jsonfile)
-
-            min_index, min_value = min(enumerate(data), key=lambda x: x[1]["max_defo"][0])
-
+            # limit = -params.step_1.allowable_disp
+            min_index, min_value = max(enumerate(data), key=lambda x: x[1]["max_defo"])
             opt_model = models[min_index]
 
-            sf = 10
+            sf = 20
 
             color_dict = {
                 "Truss": vkt.Material(color=vkt.Color(r=255, g=105, b=180)),   # Bright Pastel Pink
                 "Column": vkt.Material(color=vkt.Color(r=100, g=200, b=250)),  # Bright Pastel Blue
                 "Joist": vkt.Material(color=vkt.Color(r=255, g=220, b=130)),   # Bright Pastel Yellow
             }
-            for node_id, node_vals in opt_model["nodes"].items():
+            for node_id, _ in opt_model["nodes"].items():
                 defo = sf * data[min_index]["deformations"][str(node_id)]
                 opt_model["nodes"][node_id]["z"] = opt_model["nodes"][node_id]["z"] + defo
+
+            for line_id, dict_vals in  opt_model["lines"].items():
+                ni = str(dict_vals["nodeI"])
+                nj = str(dict_vals["nodeI"])
+                defo_ni = data[min_index]["deformations"][str(ni)]
+                defo_nj = data[min_index]["deformations"][str(nj)]
+
+                opt_model["lines"][line_id].update({"deformation": 0.5*(abs(defo_ni)+abs(defo_nj))})
+                print(opt_model["lines"][line_id])
 
             COLOR_BY = "component"
 
             section_dict = {"Truss": 150, "Column": 500, "Joist": 100}
-
             sections_group = self.render_frame_elements(
-                lines=opt_model["lines"], nodes=opt_model["nodes"], color_dict=color_dict, section_dict=section_dict, COLOR_BY=COLOR_BY
+                lines=opt_model["lines"], nodes=opt_model["nodes"], color_dict=color_dict, section_dict=section_dict, COLOR_BY=COLOR_BY,deformation= True, max_defo=abs(min_value['max_defo'])
             )
 
         return vkt.GeometryResult(geometry=sections_group)
+    
+    @vkt.PlotlyView("Model Comparison")
+    def get_hist_view(self, params, **kwargs):
+        limit = -params.step_1.allowable_disp
+        output_json = Path.cwd() / "app" / "output copy 2.json"
+        
+        with open(output_json) as jsonfile:
+            data = json.load(jsonfile)
+
+        # Extract model names and deformations from data
+        model_names = [item.get("model_name", f"Model {index + 1}") for index, item in enumerate(data)]
+        deformations = [item["max_defo"] for item in data]
+
+        # Create a bar plot with different colors for each bar
+        fig = go.Figure(data=[go.Bar(x=model_names, y=deformations, marker=dict(color=deformations, coloraxis="coloraxis"))])
+
+        # Add the horizontal dashed line for the limit
+        fig.add_shape(
+            type="line",
+            x0=-0.5,  # Start of the x-axis
+            x1=len(model_names) - 0.5,  # End of the x-axis
+            y0=limit,
+            y1=limit,
+            line=dict(color="red", width=2, dash="dash"),
+        )
+
+        # Customize the layout
+        fig.update_layout(
+            title="Model Deformations",
+            xaxis_title="Model Name",
+            yaxis_title="Deformation",
+            xaxis_tickangle=-45,
+            coloraxis=dict(colorscale="Viridis"),
+            plot_bgcolor="white"
+        )
+
+        # Convert the figure to JSON
+        return vkt.PlotlyResult(fig.to_json())
+
+    
+    def get_color_from_displacement(self, displacement, max_displacement, partitions=30):
+        # Normalize the displacement value
+        normalized_displacement = displacement / max_displacement if max_displacement != 0 else 0
+
+        # Generate a colormap with the specified number of partitions
+        base_cmap = plt.get_cmap('jet')  # You can choose other base colormaps if needed
+        discrete_cmap = ListedColormap(base_cmap(np.linspace(0, 1, partitions)))
+
+        # Get the RGB color from the discrete colormap
+        rgb_color = discrete_cmap(normalized_displacement)[:3]  # Exclude alpha channel
+
+        # Return color as RGB tuple scaled to 255
+        return tuple(int(x * 255) for x in rgb_color)
+                    

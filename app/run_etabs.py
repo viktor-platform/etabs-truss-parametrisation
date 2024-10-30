@@ -103,7 +103,7 @@ def create_etabs_model(EtabsObject, data:dict):
             print(u3)
             joist_deformation.append(u3[0])
         
-    return {"deformations":deformations , "max_defo":max(abs(joist_deformation))}
+    return {"deformations":deformations , "max_defo":min(joist_deformation)}
 
 def run_n_times():
     result_list = []
