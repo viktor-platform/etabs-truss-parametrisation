@@ -4,3 +4,4 @@ __pycache__/
 venv/
 *.json
 *.DS_Store
+app/__pycache__/

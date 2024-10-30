@@ -1,0 +1,5 @@
+pydantic
+plotly
+pre-commit
+ruff
+comtypes

@@ -138,9 +138,7 @@ class Truss:
             tags_st2 = sorted(required_st2_ids[:] * 2)
 
             for tag_st1, tag_st2 in zip(tags_st1, tags_st2, strict=True):
-                self.lines.add_lines(
-                    Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2, component=self.component_name)
-                )
+                self.lines.add_lines(Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2, component=self.component_name))
         else:
             # Shortest way to get the right nodes
             required_st1_ids = top_chord_ids[:-1:2]
@@ -150,15 +148,11 @@ class Truss:
             tags_st2 = sorted([required_st2_ids[-1]] + required_st2_ids[:-1] * 2)
 
             for tag_st1, tag_st2 in zip(tags_st1, tags_st2, strict=True):
-                self.lines.add_lines(
-                    Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2, component=self.component_name)
-                )
+                self.lines.add_lines(Line(id=self.gen_line_tag(), nodeI=tag_st1, nodeJ=tag_st2, component=self.component_name))
 
         # Create vertical members
         for node_top, node_bottom in zip(top_chord_ids, bottom_chord_ids, strict=True):
-            self.lines.add_lines(
-                Line(id=self.gen_line_tag(), nodeI=node_top, nodeJ=node_bottom, component=self.component_name)
-            )
+            self.lines.add_lines(Line(id=self.gen_line_tag(), nodeI=node_top, nodeJ=node_bottom, component=self.component_name))
 
     def create(self) -> tuple[dict[int, Node], dict[int, Line]]:
         bottom_chord_nodes = self.create_chord_nodes(

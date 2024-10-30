@@ -46,7 +46,8 @@ ignore = [
   # mutable defaults
   "B006",
   "B018",
-  "B008"
+  "B008",
+  "ARG002"
 ]
 
 unfixable = [

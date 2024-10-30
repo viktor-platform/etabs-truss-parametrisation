@@ -13,7 +13,7 @@ def clean_model(Nodes: dict, Lines: dict) -> tuple[dict, dict]:
     duplicates = {coord: ids for coord, ids in coord_to_nodes.items() if len(ids) > 1}
 
     node_replacements = {}
-    for coord, ids in duplicates.items():
+    for _, ids in duplicates.items():
         kept_node = min(ids)  # Choose the node with the smallest ID to keep
         for duplicate_node in ids:
             if duplicate_node != kept_node:
@@ -32,5 +32,6 @@ def clean_model(Nodes: dict, Lines: dict) -> tuple[dict, dict]:
 
     return Nodes, Lines
 
-def get_nodes_by_z(Nodes:dict, z:float)->list[int]:
-    return [node_id for node_id, attrs in Nodes.items() if attrs["z"]==z]
+
+def get_nodes_by_z(Nodes: dict, z: float) -> list[int]:
+    return [node_id for node_id, attrs in Nodes.items() if attrs["z"] == z]
