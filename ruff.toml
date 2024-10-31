@@ -47,7 +47,8 @@ ignore = [
   "B006",
   "B018",
   "B008",
-  "ARG002"
+  "ARG002",
+  "ARG001"
 ]
 
 unfixable = [

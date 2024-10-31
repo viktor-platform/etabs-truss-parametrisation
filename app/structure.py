@@ -17,7 +17,7 @@ def generate_model(truss_depth, x_bay_width, y_bay_width, n_diagonals, columns_h
     truss2 = Truss(
         height=truss_depth,
         width=y_bay_width,
-        n_diagonals=n_diagonals,
+        n_diagonals=joist_n_diags,
         xo=0,
         yo=0,
         zo=columns_height,
@@ -27,7 +27,7 @@ def generate_model(truss_depth, x_bay_width, y_bay_width, n_diagonals, columns_h
     truss3 = Truss(
         height=truss_depth,
         width=y_bay_width,
-        n_diagonals=n_diagonals,
+        n_diagonals=joist_n_diags,
         xo=x_bay_width,
         yo=0,
         zo=columns_height,

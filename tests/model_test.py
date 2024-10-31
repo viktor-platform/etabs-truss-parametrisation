@@ -4,12 +4,12 @@ from app.components.clean_model import clean_model, get_nodes_by_z
 from tests.utils import plot_3d_structure
 
 # Create Truss and Columns
-x_bay_width = 10000
-y_bay_width = 10000
+x_bay_width = 8000
+y_bay_width = 15000
 columns_height = 6000
-n_diagonals = 8
-truss_depth = 500
-joist_n_diags = 2 * n_diagonals
+n_diagonals = 7
+truss_depth = 600
+joist_n_diags = 8
 
 truss1 = Truss(height=truss_depth, width=x_bay_width, n_diagonals=n_diagonals, xo=0, yo=0, zo=columns_height, plane="xz")
 truss2 = Truss(height=truss_depth, width=y_bay_width, n_diagonals=n_diagonals, xo=0, yo=0, zo=columns_height, plane="yz")

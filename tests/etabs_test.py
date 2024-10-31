@@ -44,3 +44,7 @@ def test_etabs_model():
     EtabsObject, EtabsEngine = start_etabs()
     deformations = create_etabs_model(EtabsObject=EtabsObject, data=data)
     isinstance(deformations, dict)
+
+
+if __name__ == "__main__":
+    test_etabs_model()
