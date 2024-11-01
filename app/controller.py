@@ -36,11 +36,11 @@ class Parametrization(vkt.Parametrization):
     step_1.title = vkt.Text("## Initial Parameters")
     step_1.x_bay_width = vkt.NumberField("X Bay Width [mm]", min=2000, default=8000)
     step_1.y_bay_width = vkt.NumberField("Y Bay Width [mm]", min=2000, default=15000)
-    step_1.columns_height = vkt.NumberField("Columns: Height [mm]", min=3000, default=6000)
-    step_1.n_joist = vkt.NumberField("Number of Joist", min=3, default=7)
+    step_1.columns_height = vkt.NumberField("Columns: Height [mm]", min=3000, default=6000)     # Is this input required?
+    step_1.n_joist = vkt.NumberField("Number of Joist", min=1.5, default=7)
     step_1.truss_depth = vkt.NumberField("Truss: Depth [mm]", min=300, default=600)
     step_1.joist_n_diags = vkt.NumberField("Joist: Number of Diagonals", min=5, default=8)
-    step_1.area_load = vkt.NumberField("Area Load [kN/m2]", min=5, max=7, default=5)
+    step_1.area_load = vkt.NumberField("Area Load [kN/m2]", min=1.5, max=7, default=5)
 
     step_2 = vkt.Step("Run Analysis", views=["run_model"], width=30)
     step_2.text = vkt.Text(
