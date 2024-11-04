@@ -22,11 +22,11 @@ def create_etabs_model(EtabsObject, data: dict):
     nodes = data["nodes"]
     lines = data["lines"]
     nodes_with_load = data["nodes_with_load"]
+    section_name = data["section_name"]
+    cross_section = data["section_props"]
 
     for id, node in nodes.items():
         ret, _ = EtabsObject.PointObj.AddCartesian(node["x"], node["y"], node["z"], " ", str(id))
-
-    sections = {"SHS60X3": {"depth": 50.0, "thickness": 6.0}, "EA70x6": {"depth": 70.0, "thickness": 6.0}}
 
     material_name = "S355"
     MATERIAL_STEEL = 1
@@ -34,20 +34,21 @@ def create_etabs_model(EtabsObject, data: dict):
     ret = EtabsObject.PropMaterial.SetMaterial(material_name, MATERIAL_STEEL)
     ret = EtabsObject.PropMaterial.SetMPIsotropic(material_name, 210000, 0.3, 1.2e-5)
 
+    depth = cross_section["depth"]
+    thickness = cross_section["thickness"]
     ret = EtabsObject.PropFrame.SetTube_1(
-        "SHS60X3",
+        section_name,
         material_name,
-        60,
-        60,
-        3,
-        3,
-        3,
+        depth,
+        depth,
+        thickness,
+        thickness,
+        thickness,
     )
 
     for id, line in lines.items():
         point_i = line["nodeI"]
         point_j = line["nodeJ"]
-        section_name = "SHS60X3"
         ret, _ = EtabsObject.FrameObj.AddByPoint(str(point_i), str(point_j), str(id), section_name, "Global")
 
     load_pattern_name = "MyLoadPattern"

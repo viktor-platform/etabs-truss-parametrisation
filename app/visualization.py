@@ -92,3 +92,10 @@ def get_color_from_displacement(displacement: float, max_displacement: float, pa
     # Get the RGB color from the discrete colormap
     rgb_color = discrete_cmap(normalized_displacement)[:3]  # Exclude alpha channel
     return tuple(int(x * 255) for x in rgb_color)
+
+
+sections_db = {"SHS50X3": {"depth": 60.0, "thickness": 3.0, "weight/m":4.25},
+               "SHS65X3": {"depth": 60.0, "thickness": 3.0, "weight/m":5.66},
+               "SHS75X3": {"depth": 70.0, "thickness": 3.0, "weight/m":6.6},
+               "SHS100X3": {"depth": 100.0, "thickness": 3.0, "weight/m":8.96}
+               }

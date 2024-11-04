@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 from plotly.colors import sequential
 from pathlib import Path
-
+COLUMN_HEIGHT = 6000
 
 def calculate_variants(params, **kwargs):
     # Calculate the number of variants for JST
@@ -34,7 +34,7 @@ def generate_variants(params, **kwargs):
                 "joist_value": joist_value + 1,
                 "x_bay_width": params.step_1.x_bay_width,
                 "y_bay_width": params.step_1.y_bay_width,
-                "columns_height": params.step_1.columns_height,
+                "columns_height":COLUMN_HEIGHT,
                 "joist_n_diags": params.step_1.joist_n_diags,
                 "area_load": params.step_1.area_load,
             }
@@ -133,3 +133,24 @@ def plot_displacement_vs_truss_depth(model_data, results_data, allowable_displac
     fig.write_image(str(file_path), format="png")
 
     return file_path
+
+def mass_co2_from_model(lines: dict, nodes: dict, sections_db: dict, section_name: str, co2_factor: float = 1.85):
+    weight_per_meter = sections_db[section_name]["weight/m"]
+    total_mass = 0
+    element_count = 0
+
+    for _, dict_vals in lines.items():
+        node_id_i = dict_vals["nodeI"]
+        node_id_j = dict_vals["nodeJ"]
+
+        node_i = nodes[node_id_i]
+        node_j = nodes[node_id_j]
+
+        length = ((node_j["x"] - node_i["x"])**2 + (node_j["y"] - node_i["y"])**2 + (node_j["z"] - node_i["z"])**2) ** 0.5
+        line_mass = length * weight_per_meter/1000 #/1000 to m
+        total_mass += line_mass
+        element_count += 1
+
+    total_co2_emission = total_mass * co2_factor
+
+    return total_mass, element_count, total_co2_emission

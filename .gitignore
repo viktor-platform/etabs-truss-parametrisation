@@ -5,4 +5,6 @@ venv/
 *.json
 *.DS_Store
 app/newplot.png
+app/result.png
+
 app/__pycache__/

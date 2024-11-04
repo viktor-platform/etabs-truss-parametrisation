@@ -9,17 +9,19 @@ from viktor.core import File
 from viktor.external.generic import GenericAnalysis
 
 from app.structure import generate_model
-from app.optimization import plot_displacement_vs_truss_depth, calculate_variants, generate_variants
-from app.vizualisation import render_frame_elements, create_load_arrow
+from app.optimization import plot_displacement_vs_truss_depth, calculate_variants, generate_variants, mass_co2_from_model
+from app.visualization import render_frame_elements, create_load_arrow
+from app.visualization import sections_db
 
 SF = 20
 COLOR_BY = "component"
+COLUMN_HEIGHT = 6000
 color_dict = {
     "Truss": vkt.Material(color=vkt.Color(r=255, g=105, b=180)),  # Bright Pastel Pink
     "Column": vkt.Material(color=vkt.Color(r=100, g=200, b=250)),  # Bright Pastel Blue
     "Joist": vkt.Material(color=vkt.Color(r=255, g=220, b=130)),  # Bright Pastel Yellow
 }
-section_dict = {"Truss": 150, "Column": 500, "Joist": 100}
+section_dict = {"Truss": 150, "Column": 300, "Joist": 100}
 
 
 class Parametrization(vkt.Parametrization):
@@ -35,22 +37,14 @@ class Parametrization(vkt.Parametrization):
     )
     step_1.title = vkt.Text("## Initial Parameters")
     step_1.x_bay_width = vkt.NumberField("X Bay Width [mm]", min=2000, default=8000)
-    step_1.y_bay_width = vkt.NumberField("Y Bay Width [mm]", min=2000, default=15000)
-    step_1.columns_height = vkt.NumberField("Columns: Height [mm]", min=3000, default=6000)
-    step_1.n_joist = vkt.NumberField("Number of Joist", min=1.5, default=7)
+    step_1.y_bay_width = vkt.NumberField("Y Bay Width [mm]", min=2000, default=14000)
+    step_1.n_joist = vkt.NumberField("Number of Joist", min=1.5, default=6)
     step_1.truss_depth = vkt.NumberField("Truss: Depth [mm]", min=300, default=600)
     step_1.joist_n_diags = vkt.NumberField("Joist: Number of Diagonals", min=5, default=8)
     step_1.area_load = vkt.NumberField("Area Load [kN/m2]", min=1.5, max=7, default=5)
+    step_1.section = vkt.OptionField("Cross Section", options= list(sections_db.keys()), default =list(sections_db.keys())[0]) 
 
     step_2 = vkt.Step("Run Analysis", views=["run_model"], width=30)
-    step_2.text = vkt.Text(
-        dedent(
-            """
-            ## Results!
-            The following view shows the deformed shape for the optimal model with the lowest displacement. The next view, **Model Comparison**, shows the deformation for each of the analyzed models and displays the allowable limit.
-            """
-        )
-    )
 
     step_3 = vkt.Step("Optimize", width=40)
     step_3.txt_tile = vkt.Text("# Optimization Settings")
@@ -82,11 +76,13 @@ class Controller(vkt.Controller):
             params.step_1.x_bay_width,
             params.step_1.y_bay_width,
             params.step_1.n_joist + 1,
-            params.step_1.columns_height,
+            COLUMN_HEIGHT,
             params.step_1.joist_n_diags,
             params.step_1.area_load,
         )
         # Render Structure
+        selected_section = sections_db[params.step_1.section]["depth"]
+        section_dict = {"Truss":selected_section , "Column": 300, "Joist": selected_section}
         sections_group = render_frame_elements(lines, nodes, color_dict, section_dict, COLOR_BY)
         # Render loads
         for node_id in nodes_with_load:
@@ -97,14 +93,14 @@ class Controller(vkt.Controller):
 
         return vkt.GeometryResult(geometry=sections_group)
 
-    @vkt.GeometryView("Deformed model", duration_guess=1, x_axis_to_right=True)
+    @vkt.GeometryAndDataView("Deformed model", duration_guess=1, x_axis_to_right=True)
     def run_model(self, params, **kwargs) -> vkt.GeometryResult:
         nodes, lines, nodes_with_load, supports, point_load = generate_model(
             params.step_1.truss_depth,
             params.step_1.x_bay_width,
             params.step_1.y_bay_width,
             params.step_1.n_joist + 1,
-            params.step_1.columns_height,
+            COLUMN_HEIGHT,
             params.step_1.joist_n_diags,
             params.step_1.area_load,
         )
@@ -116,6 +112,8 @@ class Controller(vkt.Controller):
                 "nodes_with_load": nodes_with_load,
                 "load_magnitud": point_load,
                 "supports": supports,
+                "section_name": params.step_1.section,
+                "section_props": sections_db[params.step_1.section]
             }
         )
         # Run Etabs model with worker
@@ -131,9 +129,11 @@ class Controller(vkt.Controller):
             nj = str(dict_vals["nodeI"])
             defo_ni = results_data[0]["deformations"][str(ni)]
             defo_nj = results_data[0]["deformations"][str(nj)]
-
             opt_model["lines"][line_id].update({"deformation": 0.5 * (abs(defo_ni) + abs(defo_nj))})
 
+        max_defo = abs(results_data[0]["max_defo"])
+        selected_section = sections_db[params.step_1.section]["depth"]
+        section_dict = {"Truss":selected_section , "Column": 300, "Joist": selected_section}
         sections_group = render_frame_elements(
             lines=opt_model["lines"],
             nodes=opt_model["nodes"],
@@ -141,33 +141,51 @@ class Controller(vkt.Controller):
             section_dict=section_dict,
             COLOR_BY=COLOR_BY,
             deformation=True,
-            max_defo=abs(results_data[0]["max_defo"]),
+            max_defo=max_defo,
         )
 
-        return vkt.GeometryResult(geometry=sections_group)
+
+        #Data results
+        total_mass, element_count, total_co2_emission  = mass_co2_from_model(lines=opt_model["lines"], nodes = opt_model["nodes"], section_name=params.step_1.section, sections_db=sections_db)
+
+        data_result = vkt.DataGroup(
+            vkt.DataItem("Output","Model Results", subgroup=vkt.DataGroup(
+                    vkt.DataItem("Total mass", total_mass, suffix="kg", number_of_decimals=2),
+                    vkt.DataItem("Number of Steel Members", element_count, suffix="-", number_of_decimals=2),
+                    vkt.DataItem("Total Co2 Emissions", total_co2_emission, suffix="Co2(kg)", number_of_decimals=2),
+                    vkt.DataItem("Max. Displacement", max_defo, suffix="mm", number_of_decimals=3),
+                    )
+            )
+        )
+
+        return vkt.GeometryAndDataResult(sections_group,data_result)
 
     def optimal_curve(self, params, **kwargs) -> vkt.OptimizationResult:
         variants = generate_variants(params, **kwargs)
         models = []
+        co2s = []
         for variant in variants:
             nodes, lines, nodes_with_load, supports, point_load = generate_model(
                 variant["truss_depth_value"],
                 variant["x_bay_width"],
                 variant["y_bay_width"],
                 variant["joist_value"],
-                variant["columns_height"],
+                COLUMN_HEIGHT,
                 variant["joist_n_diags"],
                 variant["area_load"],
             )
             models.append(
                 {
-                    "nodes": nodes,
-                    "lines": lines,
-                    "nodes_with_load": nodes_with_load,
-                    "load_magnitud": point_load,
-                    "supports": supports,
-                }
-            )
+                "nodes": nodes,
+                "lines": lines,
+                "nodes_with_load": nodes_with_load,
+                "load_magnitud": point_load,
+                "supports": supports,
+                "section_name": params.step_1.section,
+                "section_props": sections_db[params.step_1.section]
+            })
+            _, _, total_co2_emission  = mass_co2_from_model(lines=lines, nodes = nodes, section_name=params.step_1.section, sections_db=sections_db)
+            co2s.append(total_co2_emission)
         # Run multiple models
         results_data = self.run_worker(models=models)
         # Generate optimization result image.
@@ -176,14 +194,15 @@ class Controller(vkt.Controller):
         )
         # Generate OptimizationResult: includes images and tables
         results = []
-        for model, result in zip(variants, results_data, strict=True):
+        for model, result,co2 in zip(variants, results_data, co2s,strict=True):
             joist_number = model["joist_value"] - 1
             truss_depth = model["truss_depth_value"]
             max_defo = abs(result["max_defo"])
+
             params = {"step_1": {"truss_depth": truss_depth, "n_joist": joist_number}}
-            results.append(vkt.OptimizationResultElement(params, {"Deformation": round(max_defo, 2)}))
+            results.append(vkt.OptimizationResultElement(params, {"Deformation": round(max_defo, 2),"Emissions (kg Co2)":round(co2,2)}))
         # Pack results
-        output_headers = {"Deformation": "Deformation"}
+        output_headers = {"Deformation": "Deformation","Emissions (kg Co2)":"Emissions (kg Co2)"}
         return vkt.OptimizationResult(
             results,
             ["step_1.truss_depth", "step_1.n_joist"],
